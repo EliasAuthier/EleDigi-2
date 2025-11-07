@@ -45,6 +45,59 @@ typedef word_t page[0x400/sizeof(uint32_t)];
 
 // Memory map
 
+
+#define RCC_BASE            0x40021000 //direccion base del RCC
+#define CR_OFFSET           0x00
+#define CFGR_OFFSET         0x04
+#define CIR_OFFSET          0x08
+#define APB2RSTR_OFFSET     0x0C
+#define APB1RSTR_OFFSET     0x10
+#define AHBENR_OFFSET       0x14
+#define APB2BENR            (*(volatile uint32_t *)(RCC_BASE + 0x18))
+#define APB12ENR_OFFSET     0x1C  
+
+//GPIO registers
+#define GPIOC_CRL           (*(volatile uint32_t *)(GPIO_PORT_C_BASE + 0x00))
+#define GPIOA_CRL           (*(volatile uint32_t *)(GPIO_PORT_A_BASE + 0x00))
+#define GPIOC_CRH           (*(volatile uint32_t *)(GPIO_PORT_C_BASE + 0x04)) 
+#define GPIOA_CRH           (*(volatile uint32_t *)(GPIO_PORT_A_BASE + 0x04)) 
+#define GPIOA_IDR           (*(volatile uint32_t *)(GPIO_PORT_A_BASE + 0x08))
+#define GPIOC_ODR           (*(volatile uint32_t *)(GPIO_PORT_C_BASE + 0x0C))
+#define GPIOA_ODR           (*(volatile uint32_t *)(GPIO_PORT_A_BASE + 0x0C))
+#define BSRR_OFFSET         0x10
+#define LCKR_OFFSET         0x18
+
+#define GPIO_PORT_A_BASE    0x40010800 //direccion base del GPIO puerto A
+#define GPIO_PORT_B_BASE    0x40010C00 //direccion base del GPIO puerto B
+#define GPIO_PORT_C_BASE    0x40011000 //direccion base del GPIO puerto C
+
+//SYSTICK REGISTERS
+#define SYSTICK_BASE        0XE000E000
+#define SYSTICK_CTRL        (*(volatile uint32_t *)(SYSTICK_BASE + 0x00))
+#define SYSTICK_LOAD        (*(volatile uint32_t *)(SYSTICK_BASE + 0x04))
+#define SYSTICK_VAL         (*(volatile uint32_t *)(SYSTICK_BASE + 0x08))//PAG 154
+#define SYSTICK_CSR         (*(volatile uint32_t *)(SYSTICK_BASE + 0x10))
+#define SYSTICK_RVR         (*(volatile uint32_t *)(SYSTICK_BASE + 0x14))
+#define SYSTICK_CVR         (*(volatile uint32_t *)(SYSTICK_BASE + 0x18))
+#define SYSTICK_CALIB       (*(volatile uint32_t *)(SYSTICK_BASE + 0x1C))
+
+//EXTI REGISTERS
+#define EXTI_BASE           0x40010400
+#define EXTI_IMR            (*(volatile uint32_t *)(EXTI_BASE + 0x00))
+#define EXTI_EMR            (*(volatile uint32_t *)(EXTI_BASE + 0x04))
+#define EXTI_RTSR           (*(volatile uint32_t *)(EXTI_BASE + 0x08))
+#define EXTI_FTSR           (*(volatile uint32_t *)(EXTI_BASE + 0x0C))
+#define EXTI_SWIER          (*(volatile uint32_t *)(EXTI_BASE + 0x10))
+#define EXTI_PR             (*(volatile uint32_t *)(EXTI_BASE + 0x14))
+
+//AFIO REGISTERS
+#define AFIO_BASE           0x40010000  
+#define AFIO_EXTICR1        (*(volatile uint32_t *)(AFIO_BASE + 0x08))   
+
+//NVIC REGISTERS
+#define NVIC_BASE           0xE000E100
+#define NVIC_ISER0        (*(volatile uint32_t *)(NVIC_BASE + 0x00))   
+
 enum {TIM2	= 0, TIM3  = 1, TIM4  = 2 };
 enum {GPIOA = 0, GPIOB = 1, GPIOC = 2, GPIOD = 3, GPIOE = 4, GPIOF = 5 };
 enum {DMA1	= 0 };
@@ -232,20 +285,13 @@ struct {
 } volatile *const CTX = ((void *) 0xE0000000);
 
 enum IRQs {
-	IRQ_DMA1CHN2  = 12,
-	IRQ_ADC1_2	  = 18,
-	IRQ_TIM2	  = 28,
-	IRQ_USART1	  = 37,
+	EXTI_0 = 6,
 };
 
 int  main(void);
-void handler_systick(void);
-void handler_dma1chn2(void);
-void handler_adc1_2(void);
-void handler_tim2(void);
-void handler_usart1(void);
+void  EXTI0_handler(void);
 
-const interrupt_t vector_table[] __attribute__ ((section(".vtab"))) = {
+const interrupt_t vector_table[256] __attribute__ ((section(".vtab"))) = {
 	STACKINIT,												// 0x0000_0000 Stack Pointer
 	(interrupt_t) main,										// 0x0000_0004 Reset
 	0,														// 0x0000_0008
@@ -261,94 +307,61 @@ const interrupt_t vector_table[] __attribute__ ((section(".vtab"))) = {
 	0,														// 0x0000_0030
 	0,														// 0x0000_0034
 	0,														// 0x0000_0038
-	0,														// 0x0000_003C
-	0,														// 0x0000_0040
-	0,														// 0x0000_0044
-	0,														// 0x0000_0048
-	0,														// 0x0000_004C
-	0,														// 0x0000_0050
-	0,														// 0x0000_0054
-	0,														// 0x0000_0058
-	0,														// 0x0000_005C
-	0,														// 0x0000_0060
-	0,														// 0x0000_0064
-	0,														// 0x0000_0068
-	0,														// 0x0000_006C
-	handler_dma1chn2,										// 0x0000_0070 DMA1_CHN2
-	0,														// 0x0000_0074
-	0,														// 0x0000_0078
-	0,														// 0x0000_007C
-	0,														// 0x0000_0080
-	0,														// 0x0000_0084
-	0,														// 0x0000_0088
-	0,														// 0x0000_008C
-	0,														// 0x0000_0090
-	0,														// 0x0000_0094
-	0,														// 0x0000_0098
-	0,														// 0x0000_009C
-	0,														// 0x0000_00A0
-	0,														// 0x0000_00A4
-	0,														// 0x0000_00A8
-	0,														// 0x0000_00AC
-	handler_tim2,											// 0x0000_00B0 TIM2
+	0,										                // 0x0000_003C SYSTICK
+    0,                                                      //40
+    0,                                                      //44
+    0,                                                      //48
+    0,                                                      //4C
+    0,                                                      //50
+    0,                                                      //54
+    EXTI0_handler,                                          //58
 };
 
-void handler_dma1chn2(void)
-{
-	DEVMAP->DMAs[DMA1].REGs.IFCR |= (0xf << 1);
-	CLR_IRQ(IRQ_DMA1CHN2);
+//  0x00002000 setea un 1 en el bit 13 y los demás en 0 (prende y apaga el led esto)
+uint32_t const on_data[1] = {0x00000000}; 
+uint32_t const off_data[1] = {0x00002000}; 
+
+void load_to_dma_for_switching_board_led_status(void) {
+    static uint8_t toggle = 0;  // Keeps its value between calls
+
+    if (toggle) {
+        DEVMAP->DMAs[DMA1].REGs.CHN[CHN2].CMAR = (uint32_t)on_data;
+    } else {
+        DEVMAP->DMAs[DMA1].REGs.CHN[CHN2].CMAR = (uint32_t)off_data;
+    }
+
+    toggle = !toggle;  // Flip between 0 and 1 each call
 }
 
-void handler_tim2(void)
-{
-	DEVMAP->TIMs[TIM2].REGs.SR &= ~(1 << 0);
-	CLR_IRQ(IRQ_TIM2);
+void EXTI0_handler(void){
+	load_to_dma_for_switching_board_led_status();
+	EXTI_PR |= (1 << 0); // Sirve para limpiar el pedido de interrupción y así salga de la interrupción
+	CLR_IRQ(EXTI_0);
 }
 
-// One cycle first order sigma delta sin signal -
-//  0x00002000 setea un 0 en el bit 13 y los demás en 0 (prende y apaga el led esto)
-uint32_t const data[256] = {
-	0x00002000, 0x00002000, 0x00002000, 0x00002000, 0x00002000, 0x00002000, 0x00002000, 0x00002000,
-	0x00002000, 0x00002000, 0x00002000, 0x00002000, 0x00002000, 0x00002000, 0x00002000, 0x00002000,
-	0x00002000, 0x00002000, 0x00002000, 0x00002000, 0x00002000, 0x00002000, 0x00002000, 0x00002000,
-	0x00002000, 0x00002000, 0x00002000, 0x00002000, 0x00002000, 0x00002000, 0x00002000, 0x00002000,
-	0x00002000, 0x00002000, 0x00002000, 0x00002000, 0x00002000, 0x00002000, 0x00002000, 0x00002000,
-	0x00002000, 0x00002000, 0x00002000, 0x00002000, 0x00002000, 0x00002000, 0x00002000, 0x00002000,
-	0x00002000, 0x00002000, 0x00002000, 0x00002000, 0x00002000, 0x00002000, 0x00002000, 0x00002000,
-	0x00002000, 0x00002000, 0x00002000, 0x00002000, 0x00002000, 0x00002000, 0x00002000, 0x00002000,
-	0x00002000, 0x00002000, 0x00002000, 0x00002000, 0x00002000, 0x00002000, 0x00002000, 0x00002000,
-	0x00002000, 0x00002000, 0x00002000, 0x00002000, 0x00002000, 0x00002000, 0x00002000, 0x00002000,
-	0x00002000, 0x00002000, 0x00002000, 0x00002000, 0x00002000, 0x00002000, 0x00002000, 0x00002000,
-	0x00002000, 0x00002000, 0x00002000, 0x00002000, 0x00002000, 0x00002000, 0x00002000, 0x00002000,
-	0x00002000, 0x00002000, 0x00002000, 0x00002000, 0x00002000, 0x00002000, 0x00002000, 0x00002000,
-	0x00002000, 0x00002000, 0x00002000, 0x00002000, 0x00002000, 0x00002000, 0x00002000, 0x00002000,
-	0x00002000, 0x00002000, 0x00002000, 0x00002000, 0x00002000, 0x00002000, 0x00002000, 0x00002000,
-	0x00002000, 0x00002000, 0x00002000, 0x00002000, 0x00002000, 0x00002000, 0x00002000, 0x00002000,
-	//Hasta acá seteamos todo 1, depsués todo 0. Duty cycle = 50%
-	0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000,
-	0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000,
-	0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000,
-	0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000,
-	0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000,
-	0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000,
-	0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000,
-	0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000,
-	0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000,
-	0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000,
-	0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000,
-	0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000,
-	0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000,
-	0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000,
-	0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000,
-	0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000
-};
-
-
-void config_all_gpioc_as_output(void)
+void set_gpioc_ports_as_output(void)
 {	    
-    DEVMAP->RCC.REGs.APB2ENR |= (1 << 4);					// Enable GPIOC clock.
-    DEVMAP->GPIOs[GPIOC].REGs.CRL  = 0x33333333;			// Make low GPIOC output
-    DEVMAP->GPIOs[GPIOC].REGs.CRH  = 0x33333333;			// Make high GPIOC output
+
+	DEVMAP->RCC.REGs.APB2ENR |= (1 << 4);                   // Enable GPIOC clock.
+
+	DEVMAP->GPIOs[GPIOC].REGs.CRL  = 0x33333333;            // Make low GPIOC output
+	DEVMAP->GPIOs[GPIOC].REGs.CRH  = 0x33333333;            // Make high GPIOC output
+}
+
+void set_gpioa0_as_input_rest_as_output(void)
+{	    
+    DEVMAP->RCC.REGs.APB2ENR |= (1 << 2);                   // Enable GPIOA clock.
+
+	DEVMAP->GPIOs[GPIOA].REGs.CRL  = 0x33333337;            // Make low GPIOC output
+    //Notar que se configura el GPIOA0 como pullup/pulldown, NO FLOTANTE
+	DEVMAP->GPIOs[GPIOA].REGs.CRH  = 0x33333333;            // Make high GPIOC output
+}
+
+void config_exti_0_for_gpioa0(void){
+    AFIO_EXTICR1 = 0x00; // activo interrupcion para pin A
+    EXTI_RTSR = (1 << 0); //flanco acendente 
+    EXTI_FTSR = (1 << 0); //flanco decendente
+    EXTI_IMR = (1 << 0); // MR0 = 1 (not masked)
 }
 
 void config_dma_to_write_on_gpioc(void)
@@ -356,8 +369,8 @@ void config_dma_to_write_on_gpioc(void)
 	DEVMAP->RCC.REGs.APB1ENR |= (1 << 0);					// Enable TIM2 clock.
 	DEVMAP->RCC.REGs.AHBENR  |= (1 << 0);					// Enable DMA1 clock.
 
-	DEVMAP->DMAs[DMA1].REGs.CHN[CHN2].CNDTR = sizeof(data)/sizeof(uint32_t); // Transfer size
-	DEVMAP->DMAs[DMA1].REGs.CHN[CHN2].CMAR	= (uint32_t) data;				 // Memory source address
+	DEVMAP->DMAs[DMA1].REGs.CHN[CHN2].CNDTR = sizeof(on_data)/sizeof(uint32_t); // Transfer size
+	DEVMAP->DMAs[DMA1].REGs.CHN[CHN2].CMAR	= (uint32_t) on_data;				 // Memory source address, inicializamos en ON
 	DEVMAP->DMAs[DMA1].REGs.CHN[CHN2].CPAR	= (uint32_t) &DEVMAP->GPIOs[GPIOC].REGs.ODR; // Peripheral destination address
 
 	DEVMAP->DMAs[DMA1].REGs.CHN[CHN2].CCR  = 0;				// Reset CCR
@@ -369,29 +382,15 @@ void config_dma_to_write_on_gpioc(void)
 	DEVMAP->DMAs[DMA1].REGs.CHN[CHN2].CCR &= ~(1 << 6);		// Disable peripheral increment mode
 	DEVMAP->DMAs[DMA1].REGs.CHN[CHN2].CCR |=  (1 << 5);		// Enable circular mode
 	DEVMAP->DMAs[DMA1].REGs.CHN[CHN2].CCR |=  (1 << 4);		// Read from memory
-	DEVMAP->DMAs[DMA1].REGs.CHN[CHN2].CCR |=  (1 << 2);		// Enable half transfer completed interrupt
-	DEVMAP->DMAs[DMA1].REGs.CHN[CHN2].CCR |=  (1 << 1);		// Enable transfer completed interrupt
-	ENA_IRQ(IRQ_DMA1CHN2);									// Enable DMA1 Channel2 inturrupt on NVIC
 
 	DEVMAP->DMAs[DMA1].REGs.CHN[CHN2].CCR |= (1 << 0);		// Enable DMA
 
-	ENA_IRQ(IRQ_TIM2);										// Enable TIM2 interrupt on NVIC
 	DEVMAP->TIMs[TIM2].REGs.CR1  = 0x0000;					// Reset CR1 just in case
     //	DEVMAP->TIMs[TIM2].REGs.CR1  |= (1 << 4);				// Down counter mode
-	
-	// CON ESTA LÍNEA:
-	DEVMAP->TIMs[TIM2].REGs.PSC   = (72e6/9)/(sizeof(data)/sizeof(data[0]))-1;	// 31249
-	// DA LUGAR A QUE EL .ARR DETERMINE LA CANTIDAD DE SEGUNDOS DE PERÍODO +2
-	// EJEMPLO CON EL .ARR SETEADO EN 3, TENGO UNA SEÑAL DE PERÍODO 5.
-
-	// Con esta config, y 256 muestras en data, la señal tiene un período de 9 segundos (4.5 en 3.3V, 4.5 en 0V)
-    DEVMAP->TIMs[TIM2].REGs.PSC   = (72e6/9)/(sizeof(data)/sizeof(data[0]))-1;	// fCK_PSC / (PSC[15:0] + 1)
-    DEVMAP->TIMs[TIM2].REGs.ARR   = 3;
-
+    DEVMAP->TIMs[TIM2].REGs.PSC   = (72e6/8)/(sizeof(on_data)/sizeof(on_data[0]))-1;	// fCK_PSC / (PSC[15:0] + 1)
+    DEVMAP->TIMs[TIM2].REGs.ARR   = 8-1;
     DEVMAP->TIMs[TIM2].REGs.DIER |= (1 << 14);				// Trigger DMA request enable
     DEVMAP->TIMs[TIM2].REGs.DIER |= (1 <<  8);				// Update DMA request enable
-//	DEVMAP->TIMs[TIM2].REGs.DIER |= (1 <<  6);				// Enable interrupt
-//	DEVMAP->TIMs[TIM2].REGs.DIER |= (1 <<  0);				// Update interrupt enable
 
     DEVMAP->TIMs[TIM2].REGs.CR1  |= (1 << 0);				// Finally enable TIM1 module
 }
@@ -400,11 +399,14 @@ void config_dma_to_write_on_gpioc(void)
 int main(void)
 {
 	// DMA code
-    config_all_gpioc_as_output();
+	set_gpioc_ports_as_output();
+    set_gpioa0_as_input_rest_as_output();
     config_dma_to_write_on_gpioc();
+    config_exti_0_for_gpioa0();
+    ENA_IRQ(EXTI_0);
 
-
-	for(;;);
+	while(1){
+	};
 
 	return 0;
 }
