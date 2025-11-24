@@ -239,6 +239,7 @@ enum IRQs {
 };
 
 int  main(void);
+void switch_led_status(void);
 
 const interrupt_t vector_table[] __attribute__ ((section(".vtab"))) = {
 	STACKINIT,												// 0x0000_0000 Stack Pointer
@@ -256,7 +257,7 @@ const interrupt_t vector_table[] __attribute__ ((section(".vtab"))) = {
 	0,														// 0x0000_0030
 	0,														// 0x0000_0034
 	0,														// 0x0000_0038
-	0,														// 0x0000_003C
+	switch_led_status,										// 0x0000_003C
 	0,														// 0x0000_0040
 	0,														// 0x0000_0044
 	0,														// 0x0000_0048
@@ -288,41 +289,22 @@ const interrupt_t vector_table[] __attribute__ ((section(".vtab"))) = {
 	0,											// 0x0000_00B0 TIM2
 };
 
-
-unsigned char fosd (pcm_t pcm, int acc[1], pcm_t fdbk) 
+volatile uint32_t tick;
+volatile uint32_t tock;
+static int ms_counter = 0;
+void handler_systick(void)
 {
-	int diff;
-
-	diff =   fdbk;
-	diff +=  pcm;
-	diff >>= 1;
-
-	acc[0] += diff-MAXHALF;
-	return (acc[0] > 0) ? 1 : 0;
+	ms_counter++;
 }
 
-unsigned char sosd (pcm_t pcm, int acc[2], pcm_t fdbk)
+void set_systick_to_1ms(void)
 {
-	int diff1;
-	int diff2;
-
-	diff1 =   fdbk;
-	diff1 +=  pcm;
-	diff1 >>= 1;
-
-	acc[0] += diff1-MAXHALF;
-
-	diff2  = acc[0];
-	diff2 += MAXHALF;
-	diff2 += fdbk;
-	diff2 >>= 1;
-
-	acc[1] += diff2;
-	acc[1] -= MAXHALF;
-
-	return (acc[1] > 0) ? 1 : 0;
+	CTX->SYSTICK.REGs.RVR = 5e6;							// Set tick to 1ms
+	CTX->SYSTICK.REGs.CSR  = 0x00000;						// Clear register 
+	CTX->SYSTICK.REGs.CSR |= (1 << 1);						// Enable interrupt
+	CTX->SYSTICK.REGs.CSR |= (1 << 0);						// Enable SysTick
+	CTX->SYSTICK.REGs.CVR = 0;	
 }
-
 
 void switch_led_status(void)
 {	    
@@ -331,53 +313,22 @@ void switch_led_status(void)
 
 	DEVMAP->GPIOs[GPIOC].REGs.CRL  = 0x33333333;            // Make low GPIOC output
 	DEVMAP->GPIOs[GPIOC].REGs.CRH  = 0x33333333;            // Make high GPIOC output
-	DEVMAP->GPIOs[GPIOC].REGs.ODR ^= toggle << 13; 			// Switches GPIOC13 between 0 and 1
-	// MAKE SURE TOGGLE IS STRICTLY 0 OR 1
+    DEVMAP->GPIOs[GPIOC].REGs.ODR  = toggle;
 
-    toggle = !toggle;   // Next call will use the opposite sign
+    toggle = -toggle;   // Next call will use the opposite sign
 }
 
-
-void set_systick(void)
-{
-	CTX->SYSTICK.REGs.RVR = 8e6;							// Set tick time to match systick freq, therefore happening once every second 
-	CTX->SYSTICK.REGs.CSR  = 0x00000;						// Clear register 
-	CTX->SYSTICK.REGs.CSR |= (1 << 2);						// Clear /8 clock speed divide, if needed set to 0
-	CTX->SYSTICK.REGs.CSR |= (0 << 1);						// Disable interrupt
-	CTX->SYSTICK.REGs.CSR |= (1 << 0);						// Enable SysTick
-	CTX->SYSTICK.REGs.CVR = 0;	
-}
-
-
-uint32_t read_systick_bit16(void)
-{
-    return (CTX->SYSTICK.REGs.CSR >> 16) & 0x1;  // Devuelve 0 o 1
-}
-
-void alter_led_status_after_delay(int s_delay){
-	int reads_required = s_delay; // Because we have set systick to once per second
-	int reads = 0;
-	for (;;){
-		uint32_t bit_16 = read_systick_bit16();
-		if (bit_16 == 1){
-			reads++;
-			if (reads>=reads_required){
-				switch_led_status();
-				reads=0;
-			}
-		}
-	}
+void delay(int ms_delay){
+	ms_counter = 0;
+	while(ms_counter<ms_delay);
 }
 
 int main(void)
-
 {
-	DEVMAP->RCC.REGs.APB2ENR |= (1 << 4);                   // Enable GPIOC clock.
-	
-	DEVMAP->GPIOs[GPIOC].REGs.CRL  = 0x33333333;            // Make low GPIOC output
-	DEVMAP->GPIOs[GPIOC].REGs.CRH  = 0x33333333;            // Make high GPIOC output
-	set_systick();
-
-	alter_led_status_after_delay(2);	
+	set_systick_to_1ms();
+	for (;;){
+		delay(5000);
+		switch_led_status();
+	}
 	return 0;
 }

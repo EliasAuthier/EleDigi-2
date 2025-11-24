@@ -381,10 +381,10 @@ void config_dma_to_write_on_gpioc(void)
 	
 	// CON ESTA LÍNEA:
 	DEVMAP->TIMs[TIM2].REGs.PSC   = (72e6/9)/(sizeof(data)/sizeof(data[0]))-1;	// 31249
-	// DA LUGAR A QUE EL .ARR DETERMINE LA CANTIDAD DE SEGUNDOS DE PERÍODO +2
-	// EJEMPLO CON EL .ARR SETEADO EN 3, TENGO UNA SEÑAL DE PERÍODO 5.
+	// DA LUGAR A QUE EL .ARR DETERMINE LA CANTIDAD DE SEGUNDOS DE PERÍODO +1
+	// EJEMPLO CON EL .ARR SETEADO EN 3, TENGO UNA SEÑAL DE PERÍODO 4.
 
-	// Con esta config, y 256 muestras en data, la señal tiene un período de 9 segundos (4.5 en 3.3V, 4.5 en 0V)
+	// Con esta config, y 256 muestras en data, la señal tiene un período de 4 segundos (2s en 3.3V, 2s en 0V)
     DEVMAP->TIMs[TIM2].REGs.PSC   = (72e6/9)/(sizeof(data)/sizeof(data[0]))-1;	// fCK_PSC / (PSC[15:0] + 1)
     DEVMAP->TIMs[TIM2].REGs.ARR   = 3;
 

@@ -288,56 +288,6 @@ const interrupt_t vector_table[] __attribute__ ((section(".vtab"))) = {
 	0,											// 0x0000_00B0 TIM2
 };
 
-
-unsigned char fosd (pcm_t pcm, int acc[1], pcm_t fdbk) 
-{
-	int diff;
-
-	diff =   fdbk;
-	diff +=  pcm;
-	diff >>= 1;
-
-	acc[0] += diff-MAXHALF;
-	return (acc[0] > 0) ? 1 : 0;
-}
-
-unsigned char sosd (pcm_t pcm, int acc[2], pcm_t fdbk)
-{
-	int diff1;
-	int diff2;
-
-	diff1 =   fdbk;
-	diff1 +=  pcm;
-	diff1 >>= 1;
-
-	acc[0] += diff1-MAXHALF;
-
-	diff2  = acc[0];
-	diff2 += MAXHALF;
-	diff2 += fdbk;
-	diff2 >>= 1;
-
-	acc[1] += diff2;
-	acc[1] -= MAXHALF;
-
-	return (acc[1] > 0) ? 1 : 0;
-}
-
-
-void switch_led_status(void)
-{	    
-	static int toggle = 1;   // Keeps its value between calls
-	DEVMAP->RCC.REGs.APB2ENR |= (1 << 4);                   // Enable GPIOC clock.
-
-	DEVMAP->GPIOs[GPIOC].REGs.CRL  = 0x33333333;            // Make low GPIOC output
-	DEVMAP->GPIOs[GPIOC].REGs.CRH  = 0x33333333;            // Make high GPIOC output
-	DEVMAP->GPIOs[GPIOC].REGs.ODR ^= toggle << 13; 			// Switches GPIOC13 between 0 and 1
-	// MAKE SURE TOGGLE IS STRICTLY 0 OR 1
-
-    toggle = !toggle;   // Next call will use the opposite sign
-}
-
-
 void set_systick(void)
 {
 	CTX->SYSTICK.REGs.RVR = 8e6;							// Set tick time to match systick freq, therefore happening once every second 
@@ -348,36 +298,42 @@ void set_systick(void)
 	CTX->SYSTICK.REGs.CVR = 0;	
 }
 
-
-uint32_t read_systick_bit16(void)
-{
-    return (CTX->SYSTICK.REGs.CSR >> 16) & 0x1;  // Devuelve 0 o 1
-}
-
-void alter_led_status_after_delay(int s_delay){
-	int reads_required = s_delay; // Because we have set systick to once per second
-	int reads = 0;
-	for (;;){
-		uint32_t bit_16 = read_systick_bit16();
-		if (bit_16 == 1){
-			reads++;
-			if (reads>=reads_required){
-				switch_led_status();
-				reads=0;
-			}
-		}
-	}
-}
-
 int main(void)
-
+// Prende el GPIOC 14 cada 1 seg y el GPIOC 13 cada 2 
 {
-	DEVMAP->RCC.REGs.APB2ENR |= (1 << 4);                   // Enable GPIOC clock.
-	
-	DEVMAP->GPIOs[GPIOC].REGs.CRL  = 0x33333333;            // Make low GPIOC output
-	DEVMAP->GPIOs[GPIOC].REGs.CRH  = 0x33333333;            // Make high GPIOC output
-	set_systick();
+	for(;;){
+		DEVMAP->RCC.REGs.CR |= (1 << 16); //Habilitamos el oscilador HSE
+		while (!(DEVMAP->RCC.REGs.CR & (1 << 17))); //Esperamos a que el HSE esté listo
 
-	alter_led_status_after_delay(2);	
+
+		//Deshabilitamos el PLL para configurarlo
+		DEVMAP->RCC.REGs.CR &= ~(1 << 24);
+
+		//Colocamos el factor de multiplicación del PLL en 4 
+		DEVMAP->RCC.REGs.CR |= (0b0010 << 18);
+
+		//Config HSE como funte del PLL
+		DEVMAP->RCC.REGs.CR |= (1 << 16);
+
+		//Config (PLLXTPRE) para que divida por 2
+		//En 0 -> /1, en 1 -> /2
+		DEVMAP->RCC.REGs.CR |= (1 << 17);
+
+		// Habilitamos el PLL y esperamos a que esté listo
+		DEVMAP->RCC.REGs.CR |= (1 << 24);
+		while (!(DEVMAP->RCC.REGs.CR & (1 << 25)));
+
+		// Divisor del prescaler del APB1 en 2 (0b100)
+		DEVMAP->RCC.REGs.CFGR |= (0b100 << 8);
+
+		// Divisor del prescaler del APB2 en 4 (0b101)
+		DEVMAP->RCC.REGs.CFGR |= (0b000 << 11);
+
+		// Seleccionar al PLL como reloj del sistema, y esperar a que se setee
+		DEVMAP->RCC.REGs.CFGR |= (0b10 << 0);
+		while (!(DEVMAP->RCC.REGs.CFGR & (0b10 << 2)));
+
+	}
+	
 	return 0;
 }
