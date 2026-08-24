@@ -1,0 +1,7 @@
+En Windows powershell linkear el USB BUS 
+usbipd attach --wsl --busid 1-2
+usbipd bind --busid 1-2
+
+En WSL buildear y cargar al USB
+make build
+make ocd-flash
